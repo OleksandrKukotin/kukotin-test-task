@@ -19,6 +19,7 @@ import java.util.*;
 public class DocumentManager {
 
     private final Map<String, Document> storage = new HashMap<>();
+
     /**
      * Implementation of this method should upsert the document to your storage
      * And generate unique id if it does not exist, don't change [created] field
@@ -27,7 +28,10 @@ public class DocumentManager {
      * @return saved document
      */
     public Document save(Document document) {
-        storage.put(UUID.randomUUID().toString(), document);
+        if (document.id.isBlank()) {
+            document.setId(UUID.randomUUID().toString());
+        }
+        storage.put(document.id, document);
         return document;
     }
 
@@ -38,9 +42,31 @@ public class DocumentManager {
      * @return list matched documents
      */
     public List<Document> search(SearchRequest request) {
+        if ((request.getTitlePrefixes() == null || request.getTitlePrefixes().isEmpty()) &&
+                (request.getContainsContents() == null || request.getContainsContents().isEmpty()) &&
+                (request.getAuthorIds() == null || request.getAuthorIds().isEmpty()) &&
+                request.getCreatedFrom() == null &&
+                request.getCreatedTo() == null) {
+            return Collections.emptyList();
+        }
 
-        return Collections.emptyList();
+        return storage.values().stream()
+                .filter(document -> request.getContainsContents() == null ||
+                        request.getContainsContents().isEmpty() ||
+                        request.getContainsContents().stream().anyMatch(document.getContent()::contains))
+                .filter(document -> request.getAuthorIds() == null ||
+                        request.getAuthorIds().isEmpty() ||
+                        request.getAuthorIds().contains(document.getAuthor().getId()))
+                .filter(document -> request.getTitlePrefixes() == null ||
+                        request.getTitlePrefixes().isEmpty() ||
+                        request.getTitlePrefixes().stream().anyMatch(prefix -> document.getTitle().startsWith(prefix)))
+                .filter(document -> request.getCreatedFrom() == null ||
+                        document.getCreated().isAfter(request.getCreatedFrom()))
+                .filter(document -> request.getCreatedTo() == null ||
+                        document.getCreated().isBefore(request.getCreatedTo()))
+                .toList();
     }
+
 
     /**
      * Implementation this method should find document by id
@@ -49,6 +75,9 @@ public class DocumentManager {
      * @return optional document
      */
     public Optional<Document> findById(String id) {
+        if (id.isBlank()) {
+            return Optional.empty();
+        }
         return Optional.of(storage.get(id));
     }
 
