@@ -42,31 +42,50 @@ public class DocumentManager {
      * @return list matched documents
      */
     public List<Document> search(SearchRequest request) {
-        if ((request.getTitlePrefixes() == null || request.getTitlePrefixes().isEmpty()) &&
-                (request.getContainsContents() == null || request.getContainsContents().isEmpty()) &&
-                (request.getAuthorIds() == null || request.getAuthorIds().isEmpty()) &&
-                request.getCreatedFrom() == null &&
-                request.getCreatedTo() == null) {
+        if (isSearchRequestEmpty(request)) {
             return Collections.emptyList();
         }
 
         return storage.values().stream()
-                .filter(document -> request.getContainsContents() == null ||
-                        request.getContainsContents().isEmpty() ||
-                        request.getContainsContents().stream().anyMatch(document.getContent()::contains))
-                .filter(document -> request.getAuthorIds() == null ||
-                        request.getAuthorIds().isEmpty() ||
-                        request.getAuthorIds().contains(document.getAuthor().getId()))
-                .filter(document -> request.getTitlePrefixes() == null ||
-                        request.getTitlePrefixes().isEmpty() ||
-                        request.getTitlePrefixes().stream().anyMatch(prefix -> document.getTitle().startsWith(prefix)))
-                .filter(document -> request.getCreatedFrom() == null ||
-                        document.getCreated().isAfter(request.getCreatedFrom()))
-                .filter(document -> request.getCreatedTo() == null ||
-                        document.getCreated().isBefore(request.getCreatedTo()))
+                .filter(document -> matchesContent(document, request))
+                .filter(document -> matchesAuthor(document, request))
+                .filter(document -> matchesTitlePrefix(document, request))
+                .filter(document -> matchesCreatedDate(document, request))
                 .toList();
     }
 
+    private boolean isSearchRequestEmpty(SearchRequest request) {
+        return isNullOrEmpty(request.getTitlePrefixes()) &&
+                isNullOrEmpty(request.getContainsContents()) &&
+                isNullOrEmpty(request.getAuthorIds()) &&
+                request.getCreatedFrom() == null &&
+                request.getCreatedTo() == null;
+    }
+
+    private boolean matchesContent(Document document, SearchRequest request) {
+        return isNullOrEmpty(request.getContainsContents()) ||
+                request.getContainsContents().stream().anyMatch(document.getContent()::contains);
+    }
+
+    private boolean matchesAuthor(Document document, SearchRequest request) {
+        return isNullOrEmpty(request.getAuthorIds()) ||
+                request.getAuthorIds().contains(document.getAuthor().getId());
+    }
+
+    private boolean matchesTitlePrefix(Document document, SearchRequest request) {
+        return isNullOrEmpty(request.getTitlePrefixes()) ||
+                request.getTitlePrefixes().stream().anyMatch(prefix -> document.getTitle().startsWith(prefix));
+    }
+
+    private boolean matchesCreatedDate(Document document, SearchRequest request) {
+        boolean matchesFrom = request.getCreatedFrom() == null || document.getCreated().isAfter(request.getCreatedFrom());
+        boolean matchesTo = request.getCreatedTo() == null || document.getCreated().isBefore(request.getCreatedTo());
+        return matchesFrom && matchesTo;
+    }
+
+    private boolean isNullOrEmpty(List<?> list) {
+        return list == null || list.isEmpty();
+    }
 
     /**
      * Implementation this method should find document by id
